@@ -129,7 +129,7 @@ export default function AppLayout({
             </header>
 
             {/* 2. Center Content Area */}
-            <main className="pb-[180px] relative z-10 px-5">
+            <main className="relative z-10 px-5 pt-4 pb-[200px]">
                 {children}
             </main>
 

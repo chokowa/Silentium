@@ -35,7 +35,7 @@ export default function AnalysisTab({
     const recentEvents = [...events].reverse().slice(0, 10);
 
     return (
-        <div className="flex flex-col gap-6 h-full">
+        <div className="flex flex-col gap-6">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <h2 className="text-sm font-medium text-[--color-text-muted] uppercase tracking-wider">

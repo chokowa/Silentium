@@ -43,7 +43,7 @@ export default function HomeTab({
     };
 
     return (
-        <div className="h-full overflow-y-auto px-4 py-4 space-y-6">
+        <div className="px-4 py-4 space-y-6">
             {/* Situations (Built-in Presets) */}
             <section className="space-y-3">
                 <div className="flex items-center justify-between px-1">

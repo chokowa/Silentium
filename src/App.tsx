@@ -141,6 +141,36 @@ export default function App() {
     engine.setMasterVolume(value);
   }, [presets, engine]);
 
+  // MediaSession API - Persistence & Remote Control
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: 'Silentium',
+        artist: 'Noise Masking Engine',
+        album: 'Acoustic Comfort',
+        artwork: [
+          { src: 'https://chokowa.github.io/Silentium/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'https://chokowa.github.io/Silentium/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+        ]
+      });
+
+      navigator.mediaSession.setActionHandler('play', () => {
+        if (!engine.isPlaying) engine.togglePlay();
+      });
+
+      navigator.mediaSession.setActionHandler('pause', () => {
+        if (engine.isPlaying) engine.togglePlay();
+      });
+    }
+  }, [engine]);
+
+  // Sync MediaSession Playback State
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = engine.isPlaying ? 'playing' : 'paused';
+    }
+  }, [engine.isPlaying]);
+
   const handleRumbleIntensityChange = useCallback((value: number) => {
     presets.updateConfig({ rumbleIntensity: value });
     engine.setRumbleIntensity(value);
