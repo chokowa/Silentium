@@ -79,10 +79,10 @@ export default function AppLayout({
     ];
 
     return (
-        <div className="flex flex-col h-screen w-full max-w-lg mx-auto bg-[--color-bg-primary] text-[--color-text-primary] overflow-hidden font-sans relative transition-colors duration-300">
+        <div className="min-h-screen w-full max-w-lg mx-auto bg-[--color-bg-primary] text-[--color-text-primary] font-sans relative transition-colors duration-300">
 
-            {/* 1. Top Area (Fixed Height Header) */}
-            <header className="flex-none h-[180px] relative z-20 bg-gradient-to-b from-[--color-bg-surface]/80 to-[--color-bg-primary] border-b border-[--color-border]/30">
+            {/* 1. Top Area (Fixed Header) */}
+            <header className="sticky top-0 z-30 h-[160px] bg-gradient-to-b from-[--color-bg-surface]/95 to-[--color-bg-primary] border-b border-[--color-border]/30 backdrop-blur-md">
                 {/* Visualizer Background */}
                 <div className="absolute inset-0 opacity-40">
                     <DualSpectrum
@@ -96,7 +96,7 @@ export default function AppLayout({
                 <div className="relative h-full px-5 pt-6 pb-4 flex justify-between items-start pointer-events-none">
                     <div className="pointer-events-auto">
                         <h1 className="text-xl font-light tracking-[0.15em] opacity-90 text-[--color-text-primary]">SILENTIUM</h1>
-                        <p className="text-[10px] text-[--color-text-muted] tracking-widest uppercase opacity-70 mt-1">
+                        <p className="text-[10px] text-[--color-text-muted] tracking-widest uppercase opacity-70 mt-1 line-clamp-1">
                             {currentPresetName}
                         </p>
                     </div>
@@ -128,28 +128,17 @@ export default function AppLayout({
                 <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[--color-bg-primary] to-transparent pointer-events-none" />
             </header>
 
-            {/* 2. Center Content Area (Scrollable) */}
-            <main className="flex-1 overflow-y-auto relative z-10 scrollbar-hide">
-                <div className="py-6 px-5 w-full">
-                    {children}
-                    {/* 
-                        再生ボタンや操作パネルが画面下部に大きく張り出しているため、
-                        コンテンツの最後に巨大な物理的スペーサーを配置します。
-                        これにより、最下部の項目を再生ボタンよりも高い位置までスクロールして
-                        完全に遮られない状態で操作することが可能になります。
-                    */}
-                    <div className="h-[50px] pointer-events-none" aria-hidden="true" />
-                </div>
+            {/* 2. Center Content Area */}
+            <main className="pb-[180px] relative z-10 px-5">
+                {children}
             </main>
 
-            {/* 3. Bottom UI Footer - Fixed in flex-flow to prevent content overlap */}
-            <footer className="flex-none z-40 bg-[--color-bg-surface]/95 backdrop-blur-2xl border-t border-[--color-border] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] transition-colors duration-300">
+            {/* 3. Bottom UI Footer - Fixed at bottom of viewport */}
+            <footer className="fixed bottom-0 left-0 right-0 z-40 max-w-lg mx-auto bg-[--color-bg-surface]/95 backdrop-blur-2xl border-t border-[--color-border] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] transition-colors duration-300 pb-safe">
                 {/* Player Controls */}
                 <div className="px-5 py-4 flex items-center justify-between gap-4 relative">
-
-                    {/* Left: Secondary Controls */}
-                    <div className="flex-1 flex items-center justify-start gap-3 z-10">
-                        {/* Auto-Masking */}
+                    {/* ... (rest of the footer remains same but with adjustments) */}
+                    <div className="flex-1 flex items-center justify-start gap-3">
                         <button
                             onClick={onAutoMask}
                             className={`p-2.5 rounded-full transition-all duration-300 active:scale-95 border border-transparent
@@ -159,7 +148,6 @@ export default function AppLayout({
                             <Sparkles size={18} />
                         </button>
 
-                        {/* Learning */}
                         <button
                             onClick={onToggleLearning}
                             className={`p-2.5 rounded-full transition-all duration-300 active:scale-95 border
@@ -172,8 +160,7 @@ export default function AppLayout({
                         </button>
                     </div>
 
-                    {/* Center: Play Button (Inline) */}
-                    <div className="flex-none z-20">
+                    <div className="flex-none">
                         <button
                             onClick={onTogglePlay}
                             className={`relative group w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm
@@ -181,34 +168,23 @@ export default function AppLayout({
                                     ? 'bg-[--color-text-primary] text-[--color-bg-primary]'
                                     : 'bg-[--color-bg-card] border border-[--color-border] text-[--color-text-primary] hover:bg-[--color-bg-elevated]'}`}
                         >
-                            {isPlaying ? (
-                                <Pause size={20} className="fill-current" />
-                            ) : (
-                                <Play size={20} className="ml-0.5 fill-current" />
-                            )}
+                            {isPlaying ? <Pause size={20} className="fill-current" /> : <Play size={20} className="ml-0.5 fill-current" />}
                             {isPlaying && <div className="absolute inset-0 rounded-full animate-pulse-ring border border-[--color-accent-primary]/30" />}
                         </button>
                     </div>
 
-                    {/* Right: Volume */}
-                    <div className="flex-1 flex items-center justify-end gap-3 z-10">
+                    <div className="flex-1 flex items-center justify-end gap-3">
                         <Volume2 size={18} className="text-[--color-text-muted] shrink-0" />
                         <div className="relative w-24 h-8 flex items-center cursor-pointer group">
-                            {/* Track Background */}
                             <div className="absolute inset-x-0 h-1.5 bg-[--color-text-primary]/20 rounded-full border border-[--color-text-primary]/10" />
-
-                            {/* Track Fill */}
                             <div
                                 className="absolute left-0 h-1.5 bg-[--color-text-primary] group-hover:bg-[--color-accent-primary] rounded-full transition-colors"
                                 style={{ width: `${masterVolume * 100}%` }}
                             />
-
-                            {/* Thumb (Knob) */}
                             <div
                                 className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-[--color-bg-surface] border-2 border-[--color-text-primary] group-hover:border-[--color-accent-primary] shadow-sm rounded-full transform -translate-x-1/2 transition-all duration-75 group-active:scale-110 z-10"
                                 style={{ left: `${masterVolume * 100}%` }}
                             />
-
                             <input
                                 type="range" min="0" max="100" value={masterVolume * 100}
                                 onChange={(e) => onMasterVolumeChange(Number(e.target.value) / 100)}
@@ -219,7 +195,7 @@ export default function AppLayout({
                 </div>
 
                 {/* Tab Navigation */}
-                <nav className="border-t border-[--color-border]/30 flex items-center justify-around py-1 pb-safe transition-colors duration-300 bg-[--color-bg-primary]/30">
+                <nav className="border-t border-[--color-border]/30 flex items-center justify-around py-1 transition-colors duration-300 bg-[--color-bg-primary]/30">
                     {tabs.map((tab) => {
                         const Icon = tab.icon;
                         const isActive = activeTab === tab.id;
@@ -227,10 +203,10 @@ export default function AppLayout({
                             <button
                                 key={tab.id}
                                 onClick={() => onTabChange(tab.id)}
-                                className="flex flex-col items-center gap-1 group py-3 px-4 w-full relative"
+                                className="flex flex-col items-center gap-1 group py-2.5 px-4 w-full relative"
                             >
                                 <Icon
-                                    size={22}
+                                    size={20}
                                     strokeWidth={isActive ? 2.5 : 1.5}
                                     className={`transition-all duration-200 ${isActive ? 'text-[--color-accent-primary] -translate-y-0.5' : 'text-[--color-text-muted] group-hover:text-[--color-text-secondary]'}`}
                                 />
