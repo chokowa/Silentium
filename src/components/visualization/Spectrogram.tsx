@@ -164,7 +164,6 @@ export default function Spectrogram({ analyser, events, className = '', height =
             ctx.putImageData(columnImage, x, 0);
 
             // 3. イベント描画
-            const recentEvents = events.filter(e => now - e.timestamp < 30000); // 30秒以内なら表示対象 (本当はスクロールに合わせて移動すべきだが簡易実装として右端表示のみにする？)
             // いや、Spectrogramは画像としてスクロールしているので、書き込んだピクセルは勝手に移動する。
             // したがって、イベントが発生した「瞬間（フレーム）」にマーカーを書き込めば、あとは勝手に流れていく。
 

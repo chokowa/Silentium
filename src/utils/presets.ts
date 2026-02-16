@@ -34,6 +34,7 @@ export const PRESETS: SilentiumConfig[] = [
         modulation: 0.005,
         neighborSafe: true,
         neighborSafeFreq: 40,
+        roomSize: 'off',
     },
     {
         name: 'Voice Blocker',
@@ -55,6 +56,7 @@ export const PRESETS: SilentiumConfig[] = [
         modulation: 0,
         neighborSafe: true,
         neighborSafeFreq: 40,
+        roomSize: 'off',
     },
     {
         name: 'Deep Sleep',
@@ -75,6 +77,7 @@ export const PRESETS: SilentiumConfig[] = [
         modulation: 0.01,
         neighborSafe: true,
         neighborSafeFreq: 40,
+        roomSize: 'off',
     },
     {
         name: 'Focus Wall',
@@ -92,6 +95,7 @@ export const PRESETS: SilentiumConfig[] = [
         modulation: 0,
         neighborSafe: true,
         neighborSafeFreq: 40,
+        roomSize: 'off',
     },
     {
         name: 'Heavy Shield',
@@ -113,6 +117,7 @@ export const PRESETS: SilentiumConfig[] = [
         modulation: 0.005,
         neighborSafe: false, // ⚠️ Safe OFF
         neighborSafeFreq: 40,
+        roomSize: 'off',
     },
 ];
 

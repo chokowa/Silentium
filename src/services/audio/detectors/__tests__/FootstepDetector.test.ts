@@ -15,7 +15,8 @@ describe('FootstepDetector', () => {
         midBandEnergy: 0,
         highBandEnergy: 0,
         spectralFlux: flux,
-        spectralCentroid: 100
+        spectralCentroid: 100,
+        peakFrequency: 0
     });
 
     it('should detect high flux low energy signal as footstep', () => {

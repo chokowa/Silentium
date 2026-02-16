@@ -316,8 +316,6 @@ export default function App() {
 
         {activeTab === 'timer' && (
           <TimerTab
-            isPlaying={engine.isPlaying}
-            onTogglePlay={engine.togglePlay}
             timer={timer}
           />
         )}

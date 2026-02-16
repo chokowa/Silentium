@@ -15,7 +15,8 @@ describe('FrictionDetector', () => {
         midBandEnergy: midEnergy,
         highBandEnergy: 0,
         spectralFlux: 0,
-        spectralCentroid: 500
+        spectralCentroid: 500,
+        peakFrequency: 0
     });
 
     it('should not detect short bursts', () => {

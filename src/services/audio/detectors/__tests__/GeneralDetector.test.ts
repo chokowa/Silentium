@@ -15,7 +15,8 @@ describe('GeneralDetector', () => {
         midBandEnergy: 0,
         highBandEnergy: 0,
         spectralFlux: 0,
-        spectralCentroid: 0
+        spectralCentroid: 0,
+        peakFrequency: 0
     };
 
     it('should detect high energy signal as generic noise', () => {

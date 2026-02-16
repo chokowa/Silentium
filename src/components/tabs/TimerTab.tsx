@@ -1,8 +1,6 @@
 import { X, Clock } from 'lucide-react';
 
 interface TimerTabProps {
-    isPlaying: boolean;
-    onTogglePlay: () => void;
     timer: {
         timerMinutes: number;
         timerRemaining: number;
@@ -16,7 +14,7 @@ interface TimerTabProps {
  * TimerTab: スリープタイマー (Persisted Version)
  * アプリを最小化したりタブを切り替えても継続するタイマー。
  */
-export default function TimerTab({ isPlaying, onTogglePlay, timer }: TimerTabProps) {
+export default function TimerTab({ timer }: TimerTabProps) {
     const { timerMinutes, timerRemaining, isTimerActive, startTimer, stopTimer } = timer;
 
     const formatTime = (seconds: number) => {
