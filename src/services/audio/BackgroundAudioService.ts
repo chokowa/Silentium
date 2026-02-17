@@ -77,10 +77,16 @@ export class BackgroundAudioService {
         audio.loop = true;
         audio.volume = 0.01; // 最小音量（完全0だとブラウザが無視する可能性）
 
+        console.log('[BackgroundAudio] 無音Audio要素作成完了、再生試行中...');
+
         // 再生試行 (ユーザージェスチャー後に呼ばれる前提)
-        audio.play().catch(err => {
-            console.warn('[BackgroundAudio] 無音Audio再生失敗:', err);
-        });
+        audio.play()
+            .then(() => {
+                console.log('[BackgroundAudio] 無音Audio再生成功 ✓');
+            })
+            .catch(err => {
+                console.error('[BackgroundAudio] 無音Audio再生失敗 ✗:', err);
+            });
 
         this.silentAudio = audio;
     }
@@ -175,17 +181,35 @@ export class BackgroundAudioService {
         getAudioContext: () => AudioContext | null,
         modeName: string
     ): void {
+        console.log('[BackgroundAudio] サービス開始:', modeName);
+
         this.onTogglePlay = onTogglePlay;
         this.audioContextGetter = getAudioContext;
 
         // 1. 無音Audio要素の再生開始
+        console.log('[BackgroundAudio] 無音Audio要素を作成・再生...');
         this.createAndPlaySilentAudio();
 
+        if (this.silentAudio) {
+            console.log('[BackgroundAudio] 無音Audio再生開始成功');
+        }
+
         // 2. Media Session設定
-        this.setupMediaSession(modeName);
+        if ('mediaSession' in navigator) {
+            console.log('[BackgroundAudio] Media Session APIをセットアップ...');
+            this.setupMediaSession(modeName);
+            console.log('[BackgroundAudio] Media Session設定完了:', {
+                metadata: navigator.mediaSession.metadata,
+                playbackState: navigator.mediaSession.playbackState
+            });
+        } else {
+            console.warn('[BackgroundAudio] Media Session API非対応ブラウザ');
+        }
 
         // 3. visibilitychangeリスナー設定
+        console.log('[BackgroundAudio] visibilitychangeリスナー設定...');
         this.setupVisibilityHandler();
+        console.log('[BackgroundAudio] サービス開始完了');
     }
 
     /**

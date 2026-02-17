@@ -95,7 +95,10 @@ export default function AppLayout({
                 {/* Header Foreground */}
                 <div className="relative h-full px-5 pt-6 pb-4 flex justify-between items-start pointer-events-none">
                     <div className="pointer-events-auto">
-                        <h1 className="text-xl font-light tracking-[0.15em] opacity-90 text-[--color-text-primary]">SILENTIUM</h1>
+                        <div className="flex items-baseline gap-2">
+                            <h1 className="text-xl font-light tracking-[0.15em] opacity-90 text-[--color-text-primary]">SILENTIUM</h1>
+                            <span className="text-[9px] text-[--color-text-muted] tracking-wider opacity-60">v1.0.0</span>
+                        </div>
                         <p className="text-[10px] text-[--color-text-muted] tracking-widest uppercase opacity-70 mt-1 line-clamp-1">
                             {currentPresetName}
                         </p>
