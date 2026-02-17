@@ -22,7 +22,13 @@ export class BackgroundAudioService {
     private visibilityHandler: (() => void) | null = null;
     private audioContextGetter: (() => AudioContext | null) | null = null;
     private statusCallback: ((status: BackgroundAudioStatus) => void) | null = null;
-    private actionCooldown: number = 0; // Media Session二重トリガー防止タイムスタンプ
+
+    /**
+     * 意図された再生状態（true=再生中, false=停止中）
+     * HyperOS等のOSがsilent audioを自動再開した際に、
+     * これをチェックして不正な再開を抑制する
+     */
+    private _isActive: boolean = false;
 
     private _status: BackgroundAudioStatus = {
         silentAudioPlaying: false,
@@ -31,9 +37,6 @@ export class BackgroundAudioService {
         lastError: null,
     };
 
-    /**
-     * ステータス変更コールバックを設定（UI表示用）
-     */
     public onStatusChange(cb: (status: BackgroundAudioStatus) => void): void {
         this.statusCallback = cb;
     }
@@ -49,13 +52,12 @@ export class BackgroundAudioService {
 
     /**
      * 無音WAVをBlob URLとして生成
-     * Data URIではなくBlob URLを使うことでブラウザの互換性を向上
      */
     private createSilentAudioBlobUrl(): string {
         const sampleRate = 44100;
         const numChannels = 1;
         const bitsPerSample = 16;
-        const duration = 10; // 10秒（5秒最低要件を余裕を持って超える）
+        const duration = 10;
         const numSamples = sampleRate * duration;
         const dataSize = numSamples * numChannels * (bitsPerSample / 8);
         const headerSize = 44;
@@ -64,12 +66,9 @@ export class BackgroundAudioService {
         const buffer = new ArrayBuffer(fileSize);
         const view = new DataView(buffer);
 
-        // RIFF ヘッダー
         this.writeString(view, 0, 'RIFF');
         view.setUint32(4, fileSize - 8, true);
         this.writeString(view, 8, 'WAVE');
-
-        // fmt チャンク
         this.writeString(view, 12, 'fmt ');
         view.setUint32(16, 16, true);
         view.setUint16(20, 1, true);
@@ -78,12 +77,9 @@ export class BackgroundAudioService {
         view.setUint32(28, sampleRate * numChannels * (bitsPerSample / 8), true);
         view.setUint16(32, numChannels * (bitsPerSample / 8), true);
         view.setUint16(34, bitsPerSample, true);
-
-        // data チャンク (全て0 = 無音)
         this.writeString(view, 36, 'data');
         view.setUint32(40, dataSize, true);
 
-        // Blob URL生成（data URIより安定）
         const blob = new Blob([buffer], { type: 'audio/wav' });
         return URL.createObjectURL(blob);
     }
@@ -96,10 +92,9 @@ export class BackgroundAudioService {
 
     /**
      * 無音Audio要素を作成してループ再生
-     * 重要: DOMに追加しないとAndroid Chromeが認識しない
      */
     private createAndPlaySilentAudio(): void {
-        // 既存のpause中要素がある場合は再開するだけ
+        // 既存要素の再利用
         if (this.silentAudio) {
             if (this.silentAudio.paused) {
                 this.silentAudio.play()
@@ -112,13 +107,20 @@ export class BackgroundAudioService {
         const audio = document.createElement('audio');
         audio.src = this.createSilentAudioBlobUrl();
         audio.loop = true;
-        audio.volume = 0.01; // 最小音量（0だとブラウザが無視する可能性）
+        audio.volume = 0.01;
 
         // DOMに追加（Android Chromeで必須）
         audio.style.display = 'none';
         document.body.appendChild(audio);
 
-        // 再生試行 (ユーザージェスチャー後に呼ばれる前提)
+        // OSによるsilent audioの自動再開を監視・抑制
+        // HyperOS等がstop()後にaudioを勝手にresumeした場合、即座にpauseし直す
+        audio.addEventListener('play', () => {
+            if (!this._isActive) {
+                audio.pause();
+            }
+        });
+
         audio.play()
             .then(() => {
                 this.updateStatus({ silentAudioPlaying: true, lastError: null });
@@ -134,16 +136,14 @@ export class BackgroundAudioService {
     }
 
     /**
-     * 無音Audio要素を停止・破棄
+     * 無音Audio要素を完全破棄（dispose時のみ）
      */
-    private stopSilentAudio(): void {
+    private destroySilentAudio(): void {
         if (this.silentAudio) {
             this.silentAudio.pause();
-            // DOMから削除
             if (this.silentAudio.parentNode) {
                 this.silentAudio.parentNode.removeChild(this.silentAudio);
             }
-            // Blob URL解放
             if (this.silentAudio.src.startsWith('blob:')) {
                 URL.revokeObjectURL(this.silentAudio.src);
             }
@@ -154,7 +154,6 @@ export class BackgroundAudioService {
 
     /**
      * Media Session APIを設定
-     * ロック画面にメタデータとコントロールを表示
      */
     private setupMediaSession(modeName: string): void {
         if (!('mediaSession' in navigator)) {
@@ -170,13 +169,12 @@ export class BackgroundAudioService {
 
         navigator.mediaSession.playbackState = 'playing';
 
-        // 再生コントロール: ロック画面の「再生」ボタン
+        // 再生コントロール
         navigator.mediaSession.setActionHandler('play', () => {
-            // クールダウン中は無視（HyperOS等の二重トリガー防止）
-            if (Date.now() - this.actionCooldown < 800) return;
-            this.actionCooldown = Date.now();
+            // 既にアクティブなら無視（二重トリガー防止）
+            if (this._isActive) return;
+            this._isActive = true;
 
-            // Chromeが自動pauseしたsilent audioを再開
             if (this.silentAudio && this.silentAudio.paused) {
                 this.silentAudio.play().catch(() => { /* 無視 */ });
             }
@@ -184,23 +182,31 @@ export class BackgroundAudioService {
             this.onTogglePlay?.();
         });
 
-        // 一時停止コントロール: ロック画面の「一時停止」ボタン
+        // 一時停止コントロール
         navigator.mediaSession.setActionHandler('pause', () => {
-            // クールダウン中は無視（HyperOS等の二重トリガー防止）
-            if (Date.now() - this.actionCooldown < 800) return;
-            this.actionCooldown = Date.now();
+            // 既に停止中なら無視（二重トリガー防止）
+            if (!this._isActive) return;
+            this._isActive = false;
 
+            if (this.silentAudio && !this.silentAudio.paused) {
+                this.silentAudio.pause();
+            }
             navigator.mediaSession.playbackState = 'paused';
             this.onTogglePlay?.();
         });
 
         // 停止コントロール（通知を閉じる操作）
         navigator.mediaSession.setActionHandler('stop', () => {
+            if (!this._isActive) return;
+            this._isActive = false;
+
+            if (this.silentAudio && !this.silentAudio.paused) {
+                this.silentAudio.pause();
+            }
             navigator.mediaSession.playbackState = 'none';
             this.onTogglePlay?.();
         });
 
-        // 不要なアクションは明示的にnullを設定
         navigator.mediaSession.setActionHandler('seekbackward', null);
         navigator.mediaSession.setActionHandler('seekforward', null);
         navigator.mediaSession.setActionHandler('previoustrack', null);
@@ -223,20 +229,18 @@ export class BackgroundAudioService {
     }
 
     /**
-     * visibilitychangeリスナーを設定
-     * バックグラウンドから復帰時にAudioContextを自動resume
+     * visibilitychangeリスナー
+     * _isActiveの場合のみAudioContext復旧を試みる
      */
     private setupVisibilityHandler(): void {
         this.visibilityHandler = () => {
-            if (document.visibilityState === 'visible') {
-                // フォアグラウンド復帰時: AudioContextを復旧
+            if (document.visibilityState === 'visible' && this._isActive) {
                 const ctx = this.audioContextGetter?.();
                 if (ctx && ctx.state === 'suspended') {
-                    ctx.resume().catch(() => { /* 復旧失敗は無視 */ });
+                    ctx.resume().catch(() => { /* 無視 */ });
                 }
-                // 無音Audioも復旧（停止している場合）
                 if (this.silentAudio && this.silentAudio.paused) {
-                    this.silentAudio.play().catch(() => { /* 復旧失敗は無視 */ });
+                    this.silentAudio.play().catch(() => { /* 無視 */ });
                 }
             }
         };
@@ -252,30 +256,26 @@ export class BackgroundAudioService {
         getAudioContext: () => AudioContext | null,
         modeName: string
     ): void {
+        this._isActive = true;
         this.onTogglePlay = onTogglePlay;
         this.audioContextGetter = getAudioContext;
 
-        // 1. 無音Audio要素の再生開始（DOMに追加）
         this.createAndPlaySilentAudio();
-
-        // 2. Media Session設定
         this.setupMediaSession(modeName);
-
-        // 3. visibilitychangeリスナー設定
         this.setupVisibilityHandler();
     }
 
     /**
      * バックグラウンド再生サービスを停止
-     * 注意: silent audioはpauseのみ（DOMから削除しない）
-     * HyperOS等でaudio要素消失時に再生が再トリガーされる問題を回避
+     * silent audioはpauseのみ（DOMから削除しない）
      */
     public stop(): void {
-        // silent audioはpauseのみ（deleteはdispose()で行う）
-        if (this.silentAudio) {
+        this._isActive = false;
+
+        if (this.silentAudio && !this.silentAudio.paused) {
             this.silentAudio.pause();
-            this.updateStatus({ silentAudioPlaying: false });
         }
+        this.updateStatus({ silentAudioPlaying: false });
 
         if ('mediaSession' in navigator) {
             navigator.mediaSession.playbackState = 'paused';
@@ -287,8 +287,8 @@ export class BackgroundAudioService {
      * 完全クリーンアップ（アンマウント時）
      */
     public dispose(): void {
-        // silent audioをDOM含めて完全破棄
-        this.stopSilentAudio();
+        this._isActive = false;
+        this.destroySilentAudio();
 
         if ('mediaSession' in navigator) {
             navigator.mediaSession.playbackState = 'none';

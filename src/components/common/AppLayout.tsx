@@ -101,7 +101,7 @@ export default function AppLayout({
                     <div className="pointer-events-auto">
                         <div className="flex items-baseline gap-2">
                             <h1 className="text-xl font-light tracking-[0.15em] opacity-90 text-[--color-text-primary]">SILENTIUM</h1>
-                            <span className="text-[9px] text-[--color-text-muted] tracking-wider opacity-60">v1.2.1</span>
+                            <span className="text-[9px] text-[--color-text-muted] tracking-wider opacity-60">v1.3.0</span>
                         </div>
                         <p className="text-[10px] text-[--color-text-muted] tracking-widest uppercase opacity-70 mt-1 line-clamp-1">
                             {currentPresetName}
