@@ -1,8 +1,9 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { AudioContextManager } from '../services/audio/AudioContextManager';
 import { NoiseGenerator } from '../services/audio/NoiseGenerator';
 import { AudioChannel } from '../services/audio/AudioChannel';
 import { NeighborSafeFilter } from '../services/audio/NeighborSafeFilter';
+import { BackgroundAudioService } from '../services/audio/BackgroundAudioService';
 import type { NoiseType, SilentiumConfig, EQBandConfig, RoomSize } from '../types/audio';
 
 const NOISE_TYPES: NoiseType[] = ['white', 'pink', 'brown', 'blue', 'violet'];
@@ -32,9 +33,14 @@ export function useAudioEngine() {
     // Organic Flow（揺らぎ）用
     const modulationDepth = useRef<number>(0);
     const animationFrameId = useRef<number | null>(null);
+    const intervalId = useRef<ReturnType<typeof setInterval> | null>(null); // バックグラウンド用setInterval
 
     const panCurrents = useRef<Map<NoiseType, number>>(new Map()); // 各chの現在パン値
     const isPlayingRef = useRef(false); // アニメーションループ内参照用
+
+    // バックグラウンド再生サービス
+    const bgService = useRef<BackgroundAudioService>(new BackgroundAudioService());
+    const currentModeName = useRef<string>('Default'); // Media Sessionメタデータ用
 
 
     /**
@@ -219,13 +225,74 @@ export function useAudioEngine() {
             ch.setModulationGain(targetVol);
         });
 
-        // 次フレーム予約
-        animationFrameId.current = requestAnimationFrame(updateOrganicFlow);
+        // 可視状態に応じて次のスケジューリング方法を選択
+        if (document.visibilityState === 'visible') {
+            // フォアグラウンド: requestAnimationFrame（滑らかだが、バックグラウンドで停止する）
+            animationFrameId.current = requestAnimationFrame(updateOrganicFlow);
+        }
+        // バックグラウンドの場合は setInterval 側がループを駆動するので、ここでは何もしない
     }, [state.isInitialized]);
 
     /**
      * 再生開始/停止のトグル
      */
+    /**
+     * Organic Flowのバックグラウンド用setIntervalを開始
+     * visibilitychangeイベントで切り替える
+     */
+    const startBackgroundInterval = useCallback(() => {
+        if (intervalId.current) return;
+        // ~60fps相当の16ms → バックグラウンドでは負荷軽減のため50msに
+        intervalId.current = setInterval(() => {
+            if (isPlayingRef.current) {
+                updateOrganicFlow();
+            }
+        }, 50);
+    }, [updateOrganicFlow]);
+
+    const stopBackgroundInterval = useCallback(() => {
+        if (intervalId.current) {
+            clearInterval(intervalId.current);
+            intervalId.current = null;
+        }
+    }, []);
+
+    /**
+     * visibilitychange切り替え: フォアグラウンド⇔バックグラウンドでループ方式を変更
+     */
+    useEffect(() => {
+        const handleVisibility = () => {
+            if (!isPlayingRef.current) return;
+
+            if (document.visibilityState === 'hidden') {
+                // バックグラウンドへ: rAF停止 → setInterval開始
+                if (animationFrameId.current) {
+                    cancelAnimationFrame(animationFrameId.current);
+                    animationFrameId.current = null;
+                }
+                startBackgroundInterval();
+            } else {
+                // フォアグラウンドへ: setInterval停止 → rAF再開
+                stopBackgroundInterval();
+                if (!animationFrameId.current) {
+                    animationFrameId.current = requestAnimationFrame(updateOrganicFlow);
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibility);
+        return () => document.removeEventListener('visibilitychange', handleVisibility);
+    }, [startBackgroundInterval, stopBackgroundInterval, updateOrganicFlow]);
+
+    /**
+     * コンポーネントアンマウント時にバックグラウンドサービスをクリーンアップ
+     */
+    useEffect(() => {
+        return () => {
+            bgService.current.dispose();
+        };
+    }, []);
+
     const togglePlay = useCallback(async () => {
         if (!state.isInitialized) {
             initialize();
@@ -244,6 +311,10 @@ export function useAudioEngine() {
 
                 // 即座にRefを更新してループを止める
                 isPlayingRef.current = false;
+
+                // バックグラウンドサービス停止
+                bgService.current.stop();
+                stopBackgroundInterval();
 
                 setTimeout(() => {
                     NOISE_TYPES.forEach((type) => {
@@ -286,12 +357,26 @@ export function useAudioEngine() {
             setState(prev => ({ ...prev, isPlaying: true }));
 
             isPlayingRef.current = true;
+
+            // バックグラウンド再生サービス開始
+            bgService.current.start(
+                () => togglePlay(),
+                () => {
+                    try {
+                        return AudioContextManager.getInstance().getContext();
+                    } catch {
+                        return null;
+                    }
+                },
+                currentModeName.current
+            );
+
             // ループ開始
             if (!animationFrameId.current) {
                 animationFrameId.current = requestAnimationFrame(updateOrganicFlow);
             }
         }
-    }, [state.isPlaying, state.isInitialized, initialize, updateOrganicFlow]);
+    }, [state.isPlaying, state.isInitialized, initialize, updateOrganicFlow, startBackgroundInterval, stopBackgroundInterval]);
 
     /**
      * 個別チャンネルのボリューム変更
@@ -405,6 +490,16 @@ export function useAudioEngine() {
     }, []);
 
     /**
+     * モード名更新（Media Sessionメタデータ用）
+     */
+    const updateModeName = useCallback((name: string) => {
+        currentModeName.current = name;
+        if (isPlayingRef.current) {
+            bgService.current.updateMetadata(name);
+        }
+    }, []);
+
+    /**
      * マスターアナライザー取得（スペクトラム表示用）
      */
     const getMasterAnalyser = useCallback((): AnalyserNode | null => {
@@ -429,6 +524,7 @@ export function useAudioEngine() {
         setRoomSize,
         setModulation,
         getMasterAnalyser,
+        updateModeName,
     };
 }
 
