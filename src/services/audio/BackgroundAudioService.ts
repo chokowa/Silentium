@@ -7,22 +7,54 @@
  * 2. Media Session API — ロック画面コントロール・メタデータ表示
  * 3. visibilitychange — フォアグラウンド復帰時のAudioContext自動復旧
  */
+
+/** 外部から参照できるステータス */
+export interface BackgroundAudioStatus {
+    silentAudioPlaying: boolean;
+    mediaSessionSupported: boolean;
+    mediaSessionActive: boolean;
+    lastError: string | null;
+}
+
 export class BackgroundAudioService {
     private silentAudio: HTMLAudioElement | null = null;
     private onTogglePlay: (() => void) | null = null;
     private visibilityHandler: (() => void) | null = null;
     private audioContextGetter: (() => AudioContext | null) | null = null;
+    private statusCallback: ((status: BackgroundAudioStatus) => void) | null = null;
+
+    private _status: BackgroundAudioStatus = {
+        silentAudioPlaying: false,
+        mediaSessionSupported: 'mediaSession' in navigator,
+        mediaSessionActive: false,
+        lastError: null,
+    };
 
     /**
-     * 無音WAVファイルをBase64 Data URIとして生成
-     * 5秒の無音ステレオWAV (44100Hz, 16bit)
+     * ステータス変更コールバックを設定（UI表示用）
      */
-    private createSilentWavDataUri(): string {
-        // WAVヘッダー + 5秒分の無音データ
+    public onStatusChange(cb: (status: BackgroundAudioStatus) => void): void {
+        this.statusCallback = cb;
+    }
+
+    public getStatus(): BackgroundAudioStatus {
+        return { ...this._status };
+    }
+
+    private updateStatus(partial: Partial<BackgroundAudioStatus>): void {
+        this._status = { ...this._status, ...partial };
+        this.statusCallback?.(this._status);
+    }
+
+    /**
+     * 無音WAVをBlob URLとして生成
+     * Data URIではなくBlob URLを使うことでブラウザの互換性を向上
+     */
+    private createSilentAudioBlobUrl(): string {
         const sampleRate = 44100;
         const numChannels = 1;
         const bitsPerSample = 16;
-        const duration = 5; // 秒
+        const duration = 10; // 10秒（5秒最低要件を余裕を持って超える）
         const numSamples = sampleRate * duration;
         const dataSize = numSamples * numChannels * (bitsPerSample / 8);
         const headerSize = 44;
@@ -38,8 +70,8 @@ export class BackgroundAudioService {
 
         // fmt チャンク
         this.writeString(view, 12, 'fmt ');
-        view.setUint32(16, 16, true); // チャンクサイズ
-        view.setUint16(20, 1, true);  // PCMフォーマット
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
         view.setUint16(22, numChannels, true);
         view.setUint32(24, sampleRate, true);
         view.setUint32(28, sampleRate * numChannels * (bitsPerSample / 8), true);
@@ -49,15 +81,10 @@ export class BackgroundAudioService {
         // data チャンク (全て0 = 無音)
         this.writeString(view, 36, 'data');
         view.setUint32(40, dataSize, true);
-        // データ部分は ArrayBuffer のデフォルト値(0) のままなので明示的な書き込み不要
 
-        // Base64エンコード
-        const bytes = new Uint8Array(buffer);
-        let binary = '';
-        for (let i = 0; i < bytes.length; i++) {
-            binary += String.fromCharCode(bytes[i]);
-        }
-        return 'data:audio/wav;base64,' + btoa(binary);
+        // Blob URL生成（data URIより安定）
+        const blob = new Blob([buffer], { type: 'audio/wav' });
+        return URL.createObjectURL(blob);
     }
 
     private writeString(view: DataView, offset: number, str: string): void {
@@ -68,24 +95,30 @@ export class BackgroundAudioService {
 
     /**
      * 無音Audio要素を作成してループ再生
+     * 重要: DOMに追加しないとAndroid Chromeが認識しない
      */
     private createAndPlaySilentAudio(): void {
         if (this.silentAudio) return;
 
         const audio = document.createElement('audio');
-        audio.src = this.createSilentWavDataUri();
+        audio.src = this.createSilentAudioBlobUrl();
         audio.loop = true;
-        audio.volume = 0.01; // 最小音量（完全0だとブラウザが無視する可能性）
+        audio.volume = 0.01; // 最小音量（0だとブラウザが無視する可能性）
 
-        console.log('[BackgroundAudio] 無音Audio要素作成完了、再生試行中...');
+        // DOMに追加（Android Chromeで必須）
+        audio.style.display = 'none';
+        document.body.appendChild(audio);
 
         // 再生試行 (ユーザージェスチャー後に呼ばれる前提)
         audio.play()
             .then(() => {
-                console.log('[BackgroundAudio] 無音Audio再生成功 ✓');
+                this.updateStatus({ silentAudioPlaying: true, lastError: null });
             })
             .catch(err => {
-                console.error('[BackgroundAudio] 無音Audio再生失敗 ✗:', err);
+                this.updateStatus({
+                    silentAudioPlaying: false,
+                    lastError: `Silent audio failed: ${err.message}`
+                });
             });
 
         this.silentAudio = audio;
@@ -97,8 +130,16 @@ export class BackgroundAudioService {
     private stopSilentAudio(): void {
         if (this.silentAudio) {
             this.silentAudio.pause();
-            this.silentAudio.src = '';
+            // DOMから削除
+            if (this.silentAudio.parentNode) {
+                this.silentAudio.parentNode.removeChild(this.silentAudio);
+            }
+            // Blob URL解放
+            if (this.silentAudio.src.startsWith('blob:')) {
+                URL.revokeObjectURL(this.silentAudio.src);
+            }
             this.silentAudio = null;
+            this.updateStatus({ silentAudioPlaying: false });
         }
     }
 
@@ -107,7 +148,10 @@ export class BackgroundAudioService {
      * ロック画面にメタデータとコントロールを表示
      */
     private setupMediaSession(modeName: string): void {
-        if (!('mediaSession' in navigator)) return;
+        if (!('mediaSession' in navigator)) {
+            this.updateStatus({ mediaSessionSupported: false });
+            return;
+        }
 
         navigator.mediaSession.metadata = new MediaMetadata({
             title: `Silentium — ${modeName}`,
@@ -131,6 +175,8 @@ export class BackgroundAudioService {
         navigator.mediaSession.setActionHandler('seekforward', null);
         navigator.mediaSession.setActionHandler('previoustrack', null);
         navigator.mediaSession.setActionHandler('nexttrack', null);
+
+        this.updateStatus({ mediaSessionActive: true });
     }
 
     /**
@@ -156,11 +202,11 @@ export class BackgroundAudioService {
                 // フォアグラウンド復帰時: AudioContextを復旧
                 const ctx = this.audioContextGetter?.();
                 if (ctx && ctx.state === 'suspended') {
-                    ctx.resume().then(() => {
-                        console.log('[BackgroundAudio] AudioContext復旧完了');
-                    }).catch(err => {
-                        console.warn('[BackgroundAudio] AudioContext復旧失敗:', err);
-                    });
+                    ctx.resume().catch(() => { /* 復旧失敗は無視 */ });
+                }
+                // 無音Audioも復旧（停止している場合）
+                if (this.silentAudio && this.silentAudio.paused) {
+                    this.silentAudio.play().catch(() => { /* 復旧失敗は無視 */ });
                 }
             }
         };
@@ -170,60 +216,35 @@ export class BackgroundAudioService {
 
     /**
      * バックグラウンド再生サービスを開始
-     * メインの再生開始時に呼び出す
-     * 
-     * @param onTogglePlay - 再生/停止トグルのコールバック（ロック画面コントロール用）
-     * @param getAudioContext - AudioContextの取得関数
-     * @param modeName - 現在のモード名（Media Sessionメタデータ用）
      */
     public start(
         onTogglePlay: () => void,
         getAudioContext: () => AudioContext | null,
         modeName: string
     ): void {
-        console.log('[BackgroundAudio] サービス開始:', modeName);
-
         this.onTogglePlay = onTogglePlay;
         this.audioContextGetter = getAudioContext;
 
-        // 1. 無音Audio要素の再生開始
-        console.log('[BackgroundAudio] 無音Audio要素を作成・再生...');
+        // 1. 無音Audio要素の再生開始（DOMに追加）
         this.createAndPlaySilentAudio();
 
-        if (this.silentAudio) {
-            console.log('[BackgroundAudio] 無音Audio再生開始成功');
-        }
-
         // 2. Media Session設定
-        if ('mediaSession' in navigator) {
-            console.log('[BackgroundAudio] Media Session APIをセットアップ...');
-            this.setupMediaSession(modeName);
-            console.log('[BackgroundAudio] Media Session設定完了:', {
-                metadata: navigator.mediaSession.metadata,
-                playbackState: navigator.mediaSession.playbackState
-            });
-        } else {
-            console.warn('[BackgroundAudio] Media Session API非対応ブラウザ');
-        }
+        this.setupMediaSession(modeName);
 
         // 3. visibilitychangeリスナー設定
-        console.log('[BackgroundAudio] visibilitychangeリスナー設定...');
         this.setupVisibilityHandler();
-        console.log('[BackgroundAudio] サービス開始完了');
     }
 
     /**
      * バックグラウンド再生サービスを停止
-     * メインの再生停止時に呼び出す
      */
     public stop(): void {
-        // 無音Audio停止
         this.stopSilentAudio();
 
-        // Media Session状態を更新
         if ('mediaSession' in navigator) {
             navigator.mediaSession.playbackState = 'paused';
         }
+        this.updateStatus({ mediaSessionActive: false });
     }
 
     /**
@@ -232,13 +253,11 @@ export class BackgroundAudioService {
     public dispose(): void {
         this.stop();
 
-        // visibilitychangeリスナー解除
         if (this.visibilityHandler) {
             document.removeEventListener('visibilitychange', this.visibilityHandler);
             this.visibilityHandler = null;
         }
 
-        // Media Sessionハンドラ解除
         if ('mediaSession' in navigator) {
             navigator.mediaSession.setActionHandler('play', null);
             navigator.mediaSession.setActionHandler('pause', null);
@@ -246,5 +265,6 @@ export class BackgroundAudioService {
 
         this.onTogglePlay = null;
         this.audioContextGetter = null;
+        this.statusCallback = null;
     }
 }

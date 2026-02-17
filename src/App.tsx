@@ -264,6 +264,7 @@ export default function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
         currentPresetName={currentPreset.name}
+        bgStatus={engine.bgStatus}
       >
         {/* Tab Content Switching */}
         {activeTab === 'home' && (

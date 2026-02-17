@@ -4,6 +4,7 @@ import { NoiseGenerator } from '../services/audio/NoiseGenerator';
 import { AudioChannel } from '../services/audio/AudioChannel';
 import { NeighborSafeFilter } from '../services/audio/NeighborSafeFilter';
 import { BackgroundAudioService } from '../services/audio/BackgroundAudioService';
+import type { BackgroundAudioStatus } from '../services/audio/BackgroundAudioService';
 import type { NoiseType, SilentiumConfig, EQBandConfig, RoomSize } from '../types/audio';
 
 const NOISE_TYPES: NoiseType[] = ['white', 'pink', 'brown', 'blue', 'violet'];
@@ -41,6 +42,17 @@ export function useAudioEngine() {
     // バックグラウンド再生サービス
     const bgService = useRef<BackgroundAudioService>(new BackgroundAudioService());
     const currentModeName = useRef<string>('Default'); // Media Sessionメタデータ用
+    const [bgStatus, setBgStatus] = useState<BackgroundAudioStatus>({
+        silentAudioPlaying: false,
+        mediaSessionSupported: 'mediaSession' in navigator,
+        mediaSessionActive: false,
+        lastError: null,
+    });
+
+    // ステータスコールバック登録
+    useEffect(() => {
+        bgService.current.onStatusChange(setBgStatus);
+    }, []);
 
 
     /**
@@ -525,6 +537,7 @@ export function useAudioEngine() {
         setModulation,
         getMasterAnalyser,
         updateModeName,
+        bgStatus,
     };
 }
 

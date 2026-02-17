@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { BackgroundAudioStatus } from '../../services/audio/BackgroundAudioService';
 import {
     Home,
     Settings2,
@@ -43,6 +44,8 @@ interface AppLayoutProps {
     onToggleTheme: () => void;
     // Meta
     currentPresetName: string;
+    // Background Audio
+    bgStatus?: BackgroundAudioStatus;
 }
 
 /**
@@ -67,7 +70,8 @@ export default function AppLayout({
     micAnalyser,
     theme,
     onToggleTheme,
-    currentPresetName
+    currentPresetName,
+    bgStatus,
 }: AppLayoutProps) {
 
     const tabs: { id: TabId; icon: any; label: string }[] = [
@@ -97,11 +101,25 @@ export default function AppLayout({
                     <div className="pointer-events-auto">
                         <div className="flex items-baseline gap-2">
                             <h1 className="text-xl font-light tracking-[0.15em] opacity-90 text-[--color-text-primary]">SILENTIUM</h1>
-                            <span className="text-[9px] text-[--color-text-muted] tracking-wider opacity-60">v1.0.0</span>
+                            <span className="text-[9px] text-[--color-text-muted] tracking-wider opacity-60">v1.1.0</span>
                         </div>
                         <p className="text-[10px] text-[--color-text-muted] tracking-widest uppercase opacity-70 mt-1 line-clamp-1">
                             {currentPresetName}
                         </p>
+                        {/* バックグラウンドステータス表示 */}
+                        {bgStatus && (
+                            <div className="flex items-center gap-1.5 mt-1">
+                                <div className={`w-1.5 h-1.5 rounded-full ${bgStatus.silentAudioPlaying ? 'bg-green-400' : 'bg-[--color-text-muted]/30'}`} />
+                                <span className="text-[8px] text-[--color-text-muted] opacity-60">
+                                    {bgStatus.lastError
+                                        ? `❌ ${bgStatus.lastError}`
+                                        : bgStatus.silentAudioPlaying
+                                            ? `BG: OK${bgStatus.mediaSessionActive ? ' · MS: OK' : ''}`
+                                            : 'BG: Standby'
+                                    }
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-3 pointer-events-auto">
