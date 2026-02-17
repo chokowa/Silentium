@@ -38,6 +38,7 @@ export function useAudioEngine() {
 
     const panCurrents = useRef<Map<NoiseType, number>>(new Map()); // 各chの現在パン値
     const isPlayingRef = useRef(false); // アニメーションループ内参照用
+    const togglePlayRef = useRef<(() => void) | null>(null); // Media Sessionコールバック用（Stale Closure防止）
 
     // バックグラウンド再生サービス
     const bgService = useRef<BackgroundAudioService>(new BackgroundAudioService());
@@ -371,8 +372,9 @@ export function useAudioEngine() {
             isPlayingRef.current = true;
 
             // バックグラウンド再生サービス開始
+            // ref経由で常に最新のtogglePlayを呼ぶ（Stale Closure防止）
             bgService.current.start(
-                () => togglePlay(),
+                () => togglePlayRef.current?.(),
                 () => {
                     try {
                         return AudioContextManager.getInstance().getContext();
@@ -389,6 +391,11 @@ export function useAudioEngine() {
             }
         }
     }, [state.isPlaying, state.isInitialized, initialize, updateOrganicFlow, startBackgroundInterval, stopBackgroundInterval]);
+
+    // togglePlayが再生成されるたびにrefを更新
+    useEffect(() => {
+        togglePlayRef.current = togglePlay;
+    }, [togglePlay]);
 
     /**
      * 個別チャンネルのボリューム変更

@@ -161,12 +161,25 @@ export class BackgroundAudioService {
 
         navigator.mediaSession.playbackState = 'playing';
 
-        // 再生/一時停止コントロール
+        // 再生コントロール: ロック画面の「再生」ボタン
         navigator.mediaSession.setActionHandler('play', () => {
+            // Chromeが自動pauseしたsilent audioを再開
+            if (this.silentAudio && this.silentAudio.paused) {
+                this.silentAudio.play().catch(() => { /* 無視 */ });
+            }
+            navigator.mediaSession.playbackState = 'playing';
             this.onTogglePlay?.();
         });
 
+        // 一時停止コントロール: ロック画面の「一時停止」ボタン
         navigator.mediaSession.setActionHandler('pause', () => {
+            navigator.mediaSession.playbackState = 'paused';
+            this.onTogglePlay?.();
+        });
+
+        // 停止コントロール（通知を閉じる操作）
+        navigator.mediaSession.setActionHandler('stop', () => {
+            navigator.mediaSession.playbackState = 'none';
             this.onTogglePlay?.();
         });
 
