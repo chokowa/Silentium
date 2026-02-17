@@ -22,6 +22,7 @@ export class BackgroundAudioService {
     private visibilityHandler: (() => void) | null = null;
     private audioContextGetter: (() => AudioContext | null) | null = null;
     private statusCallback: ((status: BackgroundAudioStatus) => void) | null = null;
+    private actionCooldown: number = 0; // Media Session二重トリガー防止タイムスタンプ
 
     private _status: BackgroundAudioStatus = {
         silentAudioPlaying: false,
@@ -98,7 +99,15 @@ export class BackgroundAudioService {
      * 重要: DOMに追加しないとAndroid Chromeが認識しない
      */
     private createAndPlaySilentAudio(): void {
-        if (this.silentAudio) return;
+        // 既存のpause中要素がある場合は再開するだけ
+        if (this.silentAudio) {
+            if (this.silentAudio.paused) {
+                this.silentAudio.play()
+                    .then(() => this.updateStatus({ silentAudioPlaying: true, lastError: null }))
+                    .catch(err => this.updateStatus({ silentAudioPlaying: false, lastError: `Resume failed: ${err.message}` }));
+            }
+            return;
+        }
 
         const audio = document.createElement('audio');
         audio.src = this.createSilentAudioBlobUrl();
@@ -163,6 +172,10 @@ export class BackgroundAudioService {
 
         // 再生コントロール: ロック画面の「再生」ボタン
         navigator.mediaSession.setActionHandler('play', () => {
+            // クールダウン中は無視（HyperOS等の二重トリガー防止）
+            if (Date.now() - this.actionCooldown < 800) return;
+            this.actionCooldown = Date.now();
+
             // Chromeが自動pauseしたsilent audioを再開
             if (this.silentAudio && this.silentAudio.paused) {
                 this.silentAudio.play().catch(() => { /* 無視 */ });
@@ -173,6 +186,10 @@ export class BackgroundAudioService {
 
         // 一時停止コントロール: ロック画面の「一時停止」ボタン
         navigator.mediaSession.setActionHandler('pause', () => {
+            // クールダウン中は無視（HyperOS等の二重トリガー防止）
+            if (Date.now() - this.actionCooldown < 800) return;
+            this.actionCooldown = Date.now();
+
             navigator.mediaSession.playbackState = 'paused';
             this.onTogglePlay?.();
         });
@@ -250,9 +267,15 @@ export class BackgroundAudioService {
 
     /**
      * バックグラウンド再生サービスを停止
+     * 注意: silent audioはpauseのみ（DOMから削除しない）
+     * HyperOS等でaudio要素消失時に再生が再トリガーされる問題を回避
      */
     public stop(): void {
-        this.stopSilentAudio();
+        // silent audioはpauseのみ（deleteはdispose()で行う）
+        if (this.silentAudio) {
+            this.silentAudio.pause();
+            this.updateStatus({ silentAudioPlaying: false });
+        }
 
         if ('mediaSession' in navigator) {
             navigator.mediaSession.playbackState = 'paused';
@@ -264,20 +287,24 @@ export class BackgroundAudioService {
      * 完全クリーンアップ（アンマウント時）
      */
     public dispose(): void {
-        this.stop();
+        // silent audioをDOM含めて完全破棄
+        this.stopSilentAudio();
+
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'none';
+            navigator.mediaSession.setActionHandler('play', null);
+            navigator.mediaSession.setActionHandler('pause', null);
+            navigator.mediaSession.setActionHandler('stop', null);
+        }
 
         if (this.visibilityHandler) {
             document.removeEventListener('visibilitychange', this.visibilityHandler);
             this.visibilityHandler = null;
         }
 
-        if ('mediaSession' in navigator) {
-            navigator.mediaSession.setActionHandler('play', null);
-            navigator.mediaSession.setActionHandler('pause', null);
-        }
-
         this.onTogglePlay = null;
         this.audioContextGetter = null;
         this.statusCallback = null;
+        this.updateStatus({ silentAudioPlaying: false, mediaSessionActive: false });
     }
 }
