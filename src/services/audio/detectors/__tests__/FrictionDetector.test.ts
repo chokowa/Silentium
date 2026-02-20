@@ -29,13 +29,13 @@ describe('FrictionDetector', () => {
     it('should detect continuous noise after threshold', () => {
         const input = createFeatures(100);
 
-        // Feed 5 frames (threshold is 5)
-        for (let i = 0; i < 4; i++) {
-            expect(detector.detect(input, 1000 + i * 20)).toBeNull();
+        // Feed 12 frames (FRAMES_THRESHOLD is 12)
+        for (let i = 0; i < 11; i++) {
+            expect(detector.detect(input, 1000 + i * 16)).toBeNull();
         }
 
-        // 5th frame should trigger
-        const event = detector.detect(input, 1100);
+        // 12th frame should trigger
+        const event = detector.detect(input, 1000 + 11 * 16);
         expect(event).not.toBeNull();
         expect(event?.type).toBe('friction');
     });
@@ -43,8 +43,8 @@ describe('FrictionDetector', () => {
     it('should reset when noise stops', () => {
         // Trigger detection first
         const inputHigh = createFeatures(100);
-        for (let i = 0; i < 6; i++) {
-            detector.detect(inputHigh, 1000 + i * 20);
+        for (let i = 0; i < 13; i++) {
+            detector.detect(inputHigh, 1000 + i * 16);
         }
 
         // Stop noise
@@ -69,11 +69,11 @@ describe('FrictionDetector', () => {
             genericSensitivity: 1.0
         };
 
-        // 5フレーム連続検知が必要
-        for (let i = 0; i < 4; i++) {
-            detector.detect(weakFeatures, 1000 + i * 20, config);
+        // 12フレーム連続検知が必要
+        for (let i = 0; i < 11; i++) {
+            detector.detect(weakFeatures, 1000 + i * 16, config);
         }
-        const result = detector.detect(weakFeatures, 1100, config);
+        const result = detector.detect(weakFeatures, 1000 + 11 * 16, config);
         expect(result).not.toBeNull();
         expect(result?.type).toBe('friction');
     });

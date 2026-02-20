@@ -21,13 +21,13 @@ describe('GeneralDetector', () => {
 
     it('should detect high energy signal as generic noise', () => {
         // Threshold: Energy 5000, Flux 500
-        const input = { ...mockFeatures, energy: 6000, midBandEnergy: 6000, spectralFlux: 600 };
+        const input = { ...mockFeatures, energy: 6000, midBandEnergy: 6000, spectralFlux: 600, peakFrequency: 500 };
         const event = detector.detect(input, 1000);
 
         expect(event).not.toBeNull();
         expect(event?.type).toBe('generic');
         expect(event?.frequencyRange.min).toBe(300);
-        expect(event?.frequencyRange.max).toBe(2000);
+        expect(event?.frequencyRange.max).toBe(700);
     });
 
     it('should ignore low energy signals', () => {
