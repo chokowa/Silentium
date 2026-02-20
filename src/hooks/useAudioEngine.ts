@@ -27,7 +27,6 @@ export function useAudioEngine() {
     const safeFilter = useRef<NeighborSafeFilter | null>(null);
     const masterAnalyser = useRef<AnalyserNode | null>(null);
     const generator = useRef<NoiseGenerator | null>(null);
-    const streamDestination = useRef<MediaStreamAudioDestinationNode | null>(null);
 
     // 現在のマスターボリュームを保持（停止/再生時の復元用）
     const lastMasterVolume = useRef<number>(0.5);
@@ -45,7 +44,7 @@ export function useAudioEngine() {
     const bgService = useRef<BackgroundAudioService>(new BackgroundAudioService());
     const currentModeName = useRef<string>('Default'); // Media Sessionメタデータ用
     const [bgStatus, setBgStatus] = useState<BackgroundAudioStatus>({
-        streamPlaying: false,
+        silentAudioPlaying: false,
         mediaSessionSupported: 'mediaSession' in navigator,
         mediaSessionActive: false,
         lastError: null,
@@ -87,10 +86,7 @@ export function useAudioEngine() {
         noiseMaster.current.connect(safeFilter.current.getInputNode());
         safeFilter.current.getOutputNode().connect(globalMaster.current);
         globalMaster.current.connect(masterAnalyser.current);
-
-        // MediaStreamDestinationを作成し、<audio>タグへ送出するための実ストリームを取り出す
-        streamDestination.current = ctx.createMediaStreamDestination();
-        masterAnalyser.current.connect(streamDestination.current);
+        masterAnalyser.current.connect(ctx.destination);
 
         // 各ノイズタイプのチャンネル作成
         NOISE_TYPES.forEach((type) => {
@@ -258,14 +254,11 @@ export function useAudioEngine() {
      * visibilitychangeイベントで切り替える
      */
     const startBackgroundInterval = useCallback(() => {
-        if (intervalId.current) return;
-        // ~60fps相当の16ms → バックグラウンドでは負荷軽減のため50msに
-        intervalId.current = setInterval(() => {
-            if (isPlayingRef.current) {
-                updateOrganicFlow();
-            }
-        }, 50);
-    }, [updateOrganicFlow]);
+        // Android等のバックグラウンド時に setInterval が不規則に実行されると、
+        // Organic Flowの音量パラメータが急激に飛んでしまい、定期的な
+        // 「ブツブツ」というクリップノイズ(音切れ)の原因になるため、
+        // バックグラウンド中は揺らぎの更新を一時停止して現在の値を維持する。
+    }, []);
 
     const stopBackgroundInterval = useCallback(() => {
         if (intervalId.current) {
@@ -377,7 +370,6 @@ export function useAudioEngine() {
 
             // バックグラウンド再生サービス開始
             // ref経由で常に最新のtogglePlayを呼ぶ（Stale Closure防止）
-            // MediaStreamDestination のストリームを渡すことで、実音声を<audio>タグで出力させる
             bgService.current.start(
                 () => togglePlayRef.current?.(),
                 () => {
@@ -387,8 +379,7 @@ export function useAudioEngine() {
                         return null;
                     }
                 },
-                currentModeName.current,
-                streamDestination.current?.stream
+                currentModeName.current
             );
 
             // ループ開始

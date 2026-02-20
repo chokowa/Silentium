@@ -101,7 +101,7 @@ export default function AppLayout({
                     <div className="pointer-events-auto">
                         <div className="flex items-baseline gap-2">
                             <h1 className="text-xl font-light tracking-[0.15em] opacity-90 text-[--color-text-primary]">SILENTIUM</h1>
-                            <span className="text-[9px] text-[--color-text-muted] tracking-wider opacity-60">v1.3.1</span>
+                            <span className="text-[9px] text-[--color-text-muted] tracking-wider opacity-60">v1.3.2</span>
                         </div>
                         <p className="text-[10px] text-[--color-text-muted] tracking-widest uppercase opacity-70 mt-1 line-clamp-1">
                             {currentPresetName}
@@ -109,11 +109,11 @@ export default function AppLayout({
                         {/* バックグラウンドステータス表示 */}
                         {bgStatus && (
                             <div className="flex items-center gap-1.5 mt-1">
-                                <div className={`w-1.5 h-1.5 rounded-full ${bgStatus.streamPlaying ? 'bg-green-400' : 'bg-[--color-text-muted]/30'}`} />
+                                <div className={`w-1.5 h-1.5 rounded-full ${bgStatus.silentAudioPlaying ? 'bg-green-400' : 'bg-[--color-text-muted]/30'}`} />
                                 <span className="text-[8px] text-[--color-text-muted] opacity-60">
                                     {bgStatus.lastError
                                         ? `❌ ${bgStatus.lastError}`
-                                        : bgStatus.streamPlaying
+                                        : bgStatus.silentAudioPlaying
                                             ? `BG: OK${bgStatus.mediaSessionActive ? ' · MS: OK' : ''}`
                                             : 'BG: Standby'
                                     }
