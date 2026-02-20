@@ -18,7 +18,6 @@ export interface BackgroundAudioStatus {
 
 export class BackgroundAudioService {
     private silentAudio: HTMLAudioElement | null = null;
-    private mediaElementSource: MediaElementAudioSourceNode | null = null;
     private onTogglePlay: (() => void) | null = null;
     private visibilityHandler: (() => void) | null = null;
     private audioContextGetter: (() => AudioContext | null) | null = null;
@@ -58,7 +57,7 @@ export class BackgroundAudioService {
         const sampleRate = 8000;
         const numChannels = 1;
         const bitsPerSample = 16;
-        const duration = 900; // 15分（ループによる定期的な切れ目を極小化）
+        const duration = 60; // 60秒ループ (メモリ節約)
         const numSamples = sampleRate * duration;
         const dataSize = numSamples * numChannels * (bitsPerSample / 8);
         const headerSize = 44;
@@ -80,6 +79,18 @@ export class BackgroundAudioService {
         view.setUint16(34, bitsPerSample, true);
         this.writeString(view, 36, 'data');
         view.setUint32(40, dataSize, true);
+
+        // デジタル無音(全ゼロ)だと、OS(特にAndroidの一部ベンダー)が
+        // 「実質的に再生していない」と判定してCPUウェイクロックを剥奪し、
+        // AudioContextの処理落ち(ブツブツ音)を引き起こす。
+        // これを防ぐため、可聴域外(10Hz)の極めて微弱なサイン波を書き込む。
+        const frequency = 10;
+        const amplitude = 32; // 16bit(±32767)中でわずか32の振幅(約 -60dB)
+        for (let i = 0; i < numSamples; i++) {
+            const t = i / sampleRate;
+            const sample = Math.round(amplitude * Math.sin(2 * Math.PI * frequency * t));
+            view.setInt16(44 + i * 2, sample, true);
+        }
 
         const blob = new Blob([buffer], { type: 'audio/wav' });
         return URL.createObjectURL(blob);
@@ -114,18 +125,6 @@ export class BackgroundAudioService {
         audio.style.display = 'none';
         document.body.appendChild(audio);
 
-        // Web Audio API と繋ぐことで、OSに「このオーディオコンテキストはアクティブなメディア要素の一部である」
-        // と認識させ、バックグラウンドでのサスペンドを強力に防止する
-        const ctx = this.audioContextGetter?.();
-        if (ctx) {
-            try {
-                this.mediaElementSource = ctx.createMediaElementSource(audio);
-                this.mediaElementSource.connect(ctx.destination);
-            } catch (e) {
-                // 既に接続されている場合等は無視
-            }
-        }
-
         // OSによるsilent audioの自動再開を監視・抑制
         // HyperOS等がstop()後にaudioを勝手にresumeした場合、即座にpauseし直す
         audio.addEventListener('play', () => {
@@ -152,10 +151,6 @@ export class BackgroundAudioService {
      * 無音Audio要素を完全破棄（dispose時のみ）
      */
     private destroySilentAudio(): void {
-        if (this.mediaElementSource) {
-            this.mediaElementSource.disconnect();
-            this.mediaElementSource = null;
-        }
         if (this.silentAudio) {
             this.silentAudio.pause();
             if (this.silentAudio.parentNode) {
