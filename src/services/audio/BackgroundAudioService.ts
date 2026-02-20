@@ -3,21 +3,21 @@
  * Android画面ロック時のバックグラウンド再生を維持するサービス
  * 
  * 3層構造:
- * 1. 無音HTML Audio要素 — OSに「メディア再生中」と認識させるキープアライブ
+ * 1. 実データストリーム(MediaStream)のHTML Audio要素再生 — OSに「メディア再生中」と認識させる
  * 2. Media Session API — ロック画面コントロール・メタデータ表示
  * 3. visibilitychange — フォアグラウンド復帰時のAudioContext自動復旧
  */
 
 /** 外部から参照できるステータス */
 export interface BackgroundAudioStatus {
-    silentAudioPlaying: boolean;
+    streamPlaying: boolean;
     mediaSessionSupported: boolean;
     mediaSessionActive: boolean;
     lastError: string | null;
 }
 
 export class BackgroundAudioService {
-    private silentAudio: HTMLAudioElement | null = null;
+    private audioElement: HTMLAudioElement | null = null;
     private onTogglePlay: (() => void) | null = null;
     private visibilityHandler: (() => void) | null = null;
     private audioContextGetter: (() => AudioContext | null) | null = null;
@@ -25,13 +25,12 @@ export class BackgroundAudioService {
 
     /**
      * 意図された再生状態（true=再生中, false=停止中）
-     * HyperOS等のOSがsilent audioを自動再開した際に、
-     * これをチェックして不正な再開を抑制する
+     * HyperOS等のOSが自動再開した際に、これをチェックして不正な再開を抑制する
      */
     private _isActive: boolean = false;
 
     private _status: BackgroundAudioStatus = {
-        silentAudioPlaying: false,
+        streamPlaying: false,
         mediaSessionSupported: 'mediaSession' in navigator,
         mediaSessionActive: false,
         lastError: null,
@@ -51,70 +50,33 @@ export class BackgroundAudioService {
     }
 
     /**
-     * 無音WAVをBlob URLとして生成
+     * 実ストリームをもつAudio要素を作成して再生
+     * これによりWeb Audio APIのサスペンドを回避する
      */
-    private createSilentAudioBlobUrl(): string {
-        const sampleRate = 44100;
-        const numChannels = 1;
-        const bitsPerSample = 16;
-        const duration = 10;
-        const numSamples = sampleRate * duration;
-        const dataSize = numSamples * numChannels * (bitsPerSample / 8);
-        const headerSize = 44;
-        const fileSize = headerSize + dataSize;
-
-        const buffer = new ArrayBuffer(fileSize);
-        const view = new DataView(buffer);
-
-        this.writeString(view, 0, 'RIFF');
-        view.setUint32(4, fileSize - 8, true);
-        this.writeString(view, 8, 'WAVE');
-        this.writeString(view, 12, 'fmt ');
-        view.setUint32(16, 16, true);
-        view.setUint16(20, 1, true);
-        view.setUint16(22, numChannels, true);
-        view.setUint32(24, sampleRate, true);
-        view.setUint32(28, sampleRate * numChannels * (bitsPerSample / 8), true);
-        view.setUint16(32, numChannels * (bitsPerSample / 8), true);
-        view.setUint16(34, bitsPerSample, true);
-        this.writeString(view, 36, 'data');
-        view.setUint32(40, dataSize, true);
-
-        const blob = new Blob([buffer], { type: 'audio/wav' });
-        return URL.createObjectURL(blob);
-    }
-
-    private writeString(view: DataView, offset: number, str: string): void {
-        for (let i = 0; i < str.length; i++) {
-            view.setUint8(offset + i, str.charCodeAt(i));
-        }
-    }
-
-    /**
-     * 無音Audio要素を作成してループ再生
-     */
-    private createAndPlaySilentAudio(): void {
+    private createAndPlayAudioElement(stream: MediaStream): void {
         // 既存要素の再利用
-        if (this.silentAudio) {
-            if (this.silentAudio.paused) {
-                this.silentAudio.play()
-                    .then(() => this.updateStatus({ silentAudioPlaying: true, lastError: null }))
-                    .catch(err => this.updateStatus({ silentAudioPlaying: false, lastError: `Resume failed: ${err.message}` }));
+        if (this.audioElement) {
+            if (this.audioElement.srcObject !== stream) {
+                this.audioElement.srcObject = stream;
+            }
+            if (this.audioElement.paused) {
+                this.audioElement.play()
+                    .then(() => this.updateStatus({ streamPlaying: true, lastError: null }))
+                    .catch(err => this.updateStatus({ streamPlaying: false, lastError: `Resume failed: ${err.message}` }));
             }
             return;
         }
 
         const audio = document.createElement('audio');
-        audio.src = this.createSilentAudioBlobUrl();
-        audio.loop = true;
-        audio.volume = 0.01;
+        audio.srcObject = stream;
+        // AudioContextの出力を流すので、ボリュームはそのまま出力する(1.0)
+        audio.volume = 1.0;
 
         // DOMに追加（Android Chromeで必須）
         audio.style.display = 'none';
         document.body.appendChild(audio);
 
-        // OSによるsilent audioの自動再開を監視・抑制
-        // HyperOS等がstop()後にaudioを勝手にresumeした場合、即座にpauseし直す
+        // OSによる自動再開を監視・抑制
         audio.addEventListener('play', () => {
             if (!this._isActive) {
                 audio.pause();
@@ -123,32 +85,30 @@ export class BackgroundAudioService {
 
         audio.play()
             .then(() => {
-                this.updateStatus({ silentAudioPlaying: true, lastError: null });
+                this.updateStatus({ streamPlaying: true, lastError: null });
             })
             .catch(err => {
                 this.updateStatus({
-                    silentAudioPlaying: false,
-                    lastError: `Silent audio failed: ${err.message}`
+                    streamPlaying: false,
+                    lastError: `Audio element failed: ${err.message}`
                 });
             });
 
-        this.silentAudio = audio;
+        this.audioElement = audio;
     }
 
     /**
-     * 無音Audio要素を完全破棄（dispose時のみ）
+     * Audio要素を完全破棄（dispose時のみ）
      */
-    private destroySilentAudio(): void {
-        if (this.silentAudio) {
-            this.silentAudio.pause();
-            if (this.silentAudio.parentNode) {
-                this.silentAudio.parentNode.removeChild(this.silentAudio);
+    private destroyAudioElement(): void {
+        if (this.audioElement) {
+            this.audioElement.pause();
+            if (this.audioElement.parentNode) {
+                this.audioElement.parentNode.removeChild(this.audioElement);
             }
-            if (this.silentAudio.src.startsWith('blob:')) {
-                URL.revokeObjectURL(this.silentAudio.src);
-            }
-            this.silentAudio = null;
-            this.updateStatus({ silentAudioPlaying: false });
+            this.audioElement.srcObject = null;
+            this.audioElement = null;
+            this.updateStatus({ streamPlaying: false });
         }
     }
 
@@ -171,12 +131,11 @@ export class BackgroundAudioService {
 
         // 再生コントロール
         navigator.mediaSession.setActionHandler('play', () => {
-            // 既にアクティブなら無視（二重トリガー防止）
             if (this._isActive) return;
             this._isActive = true;
 
-            if (this.silentAudio && this.silentAudio.paused) {
-                this.silentAudio.play().catch(() => { /* 無視 */ });
+            if (this.audioElement && this.audioElement.paused) {
+                this.audioElement.play().catch(() => { /* 無視 */ });
             }
             navigator.mediaSession.playbackState = 'playing';
             this.onTogglePlay?.();
@@ -184,12 +143,11 @@ export class BackgroundAudioService {
 
         // 一時停止コントロール
         navigator.mediaSession.setActionHandler('pause', () => {
-            // 既に停止中なら無視（二重トリガー防止）
             if (!this._isActive) return;
             this._isActive = false;
 
-            if (this.silentAudio && !this.silentAudio.paused) {
-                this.silentAudio.pause();
+            if (this.audioElement && !this.audioElement.paused) {
+                this.audioElement.pause();
             }
             navigator.mediaSession.playbackState = 'paused';
             this.onTogglePlay?.();
@@ -200,8 +158,8 @@ export class BackgroundAudioService {
             if (!this._isActive) return;
             this._isActive = false;
 
-            if (this.silentAudio && !this.silentAudio.paused) {
-                this.silentAudio.pause();
+            if (this.audioElement && !this.audioElement.paused) {
+                this.audioElement.pause();
             }
             navigator.mediaSession.playbackState = 'none';
             this.onTogglePlay?.();
@@ -239,12 +197,13 @@ export class BackgroundAudioService {
                 if (ctx && ctx.state === 'suspended') {
                     ctx.resume().catch(() => { /* 無視 */ });
                 }
-                if (this.silentAudio && this.silentAudio.paused) {
-                    this.silentAudio.play().catch(() => { /* 無視 */ });
+                if (this.audioElement && this.audioElement.paused) {
+                    this.audioElement.play().catch(() => { /* 無視 */ });
                 }
             }
         };
 
+        if (!this.visibilityHandler) return;
         document.addEventListener('visibilitychange', this.visibilityHandler);
     }
 
@@ -254,28 +213,36 @@ export class BackgroundAudioService {
     public start(
         onTogglePlay: () => void,
         getAudioContext: () => AudioContext | null,
-        modeName: string
+        modeName: string,
+        stream?: MediaStream
     ): void {
         this._isActive = true;
         this.onTogglePlay = onTogglePlay;
         this.audioContextGetter = getAudioContext;
 
-        this.createAndPlaySilentAudio();
+        if (stream) {
+            this.createAndPlayAudioElement(stream);
+        }
         this.setupMediaSession(modeName);
+
+        // 重複登録防止
+        if (this.visibilityHandler) {
+            document.removeEventListener('visibilitychange', this.visibilityHandler);
+        }
         this.setupVisibilityHandler();
     }
 
     /**
      * バックグラウンド再生サービスを停止
-     * silent audioはpauseのみ（DOMから削除しない）
+     * audio要素はpauseのみ（DOMから削除しない）
      */
     public stop(): void {
         this._isActive = false;
 
-        if (this.silentAudio && !this.silentAudio.paused) {
-            this.silentAudio.pause();
+        if (this.audioElement && !this.audioElement.paused) {
+            this.audioElement.pause();
         }
-        this.updateStatus({ silentAudioPlaying: false });
+        this.updateStatus({ streamPlaying: false });
 
         if ('mediaSession' in navigator) {
             navigator.mediaSession.playbackState = 'paused';
@@ -288,7 +255,7 @@ export class BackgroundAudioService {
      */
     public dispose(): void {
         this._isActive = false;
-        this.destroySilentAudio();
+        this.destroyAudioElement();
 
         if ('mediaSession' in navigator) {
             navigator.mediaSession.playbackState = 'none';
@@ -305,6 +272,6 @@ export class BackgroundAudioService {
         this.onTogglePlay = null;
         this.audioContextGetter = null;
         this.statusCallback = null;
-        this.updateStatus({ silentAudioPlaying: false, mediaSessionActive: false });
+        this.updateStatus({ streamPlaying: false, mediaSessionActive: false });
     }
 }

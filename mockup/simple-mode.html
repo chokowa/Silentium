@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>HushTone — UI Mockup</title>
+    <style>
+        /* ===== iOS-like Design System ===== */
+        :root {
+            /* Light Mode Colors (Base) */
+            --bg-base: #F2F2F7;
+            --bg-group: #FFFFFF;
+            --text-primary: #000000;
+            --text-secondary: #8E8E93;
+            --text-tertiary: #C7C7CC;
+            --separator: #C6C6C8;
+            --accent: #007AFF;
+            --danger: #FF3B30;
+            --success: #34C759;
+            --warning: #FF9500;
+
+            --slider-track: #E5E5EA;
+            --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+
+            --font-ui: -apple-system, BlinkMacSystemFont, "Satisfy", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --radius-lg: 16px;
+            /* iOS standard for grouped lists */
+            --radius-sm: 8px;
+
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-base: #000000;
+                --bg-group: #1C1C1E;
+                --text-primary: #FFFFFF;
+                --text-secondary: #8E8E93;
+                --text-tertiary: #48484A;
+                --separator: #38383A;
+                --slider-track: #3A3A3C;
+                --card-shadow: none;
+            }
+        }
+
+        /* Reset & Base */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html,
+        body {
+            height: 100%;
+            overflow: hidden;
+            background: var(--bg-base);
+            color: var(--text-primary);
+            font-family: var(--font-ui);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .app-shell {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding-top: var(--safe-top);
+        }
+
+        /* Navigation Bar (Top) */
+        .nav-bar {
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* background: rgba(255,255,255,0.85); */
+            /* backdrop-filter: saturate(180%) blur(20px); */
+            position: relative;
+            z-index: 100;
+            padding: 0 16px;
+        }
+
+        .nav-title {
+            font-size: 17px;
+            font-weight: 600;
+        }
+
+        .nav-right {
+            position: absolute;
+            right: 16px;
+            color: var(--accent);
+            font-size: 17px;
+            cursor: pointer;
+        }
+
+        /* Main Content Scroll Area */
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: calc(83px + var(--safe-bottom));
+            /* Fixed TabBar height */
+        }
+
+        /* List Group Style (iOS Inset Grouped) */
+        .list-group {
+            margin: 20px 16px;
+            border-radius: var(--radius-lg);
+            background: var(--bg-group);
+            overflow: hidden;
+            box-shadow: var(--card-shadow);
+        }
+
+        .list-header {
+            margin: 24px 16px 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        /* List Item */
+        .list-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            /* Taller touch target */
+            background: var(--bg-group);
+            min-height: 44px;
+        }
+
+        .list-item:not(:last-child) {
+            position: relative;
+        }
+
+        /* Separator logic */
+        .list-item:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 16px;
+            /* Indent separator */
+            right: 0;
+            height: 1px;
+            /* 0.5px on retina actually */
+            background: var(--separator);
+            transform: scaleY(0.5);
+            /* Hairline */
+        }
+
+        /* Specific Components */
+
+        /* Shield / Home Main */
+        .home-hero {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 32px 0 48px;
+        }
+
+        .shield-visual {
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            background: conic-gradient(from 180deg, var(--bg-base) 0%, var(--accent) 60%, var(--success) 100%);
+            /* Complex gradient handled in SVG usually, simplified here */
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 32px;
+            box-shadow: 0 10px 40px rgba(0, 122, 255, 0.2);
+        }
+
+        .shield-inner {
+            width: 190px;
+            height: 190px;
+            border-radius: 50%;
+            background: var(--bg-base);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .shield-percent {
+            font-size: 48px;
+            font-weight: 200;
+            /* Thin font like iOS clock */
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -2px;
+        }
+
+        .shield-status {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: -4px;
+            font-weight: 500;
+        }
+
+        /* Play Button (Big) */
+        .play-row {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            align-items: center;
+            width: 100%;
+            padding: 0 40px;
+        }
+
+        .play-btn {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: var(--text-primary);
+            /* Black in light, White in dark */
+            color: var(--bg-base);
+            border: none;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .play-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Sound Item (Vertical List) */
+        .sound-row {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            padding: 8px 0;
+        }
+
+        .sound-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: var(--bg-base);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .sound-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .sound-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 6px;
+        }
+
+        .sound-name {
+            font-size: 17px;
+            font-weight: 500;
+        }
+
+        .sound-vol-val {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* iOS Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            height: 24px;
+            /* Touch target */
+            margin: 0;
+            padding: 0;
+            display: block;
+        }
+
+        input[type=range]:focus {
+            outline: none;
+        }
+
+        /* Slider Track */
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            /* Thin track */
+            background: var(--slider-track);
+            border-radius: 2px;
+            border: none;
+        }
+
+        /* Slider Thumb */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 28px;
+            width: 28px;
+            border-radius: 50%;
+            background: #FFFFFF;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.3);
+            /* iOS Shadow */
+            margin-top: -12px;
+            /* Vertically center */
+            border: 0.5px solid rgba(0, 0, 0, 0.04);
+        }
+
+        /* Toggle Switch */
+        .ios-toggle {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 51px;
+            height: 31px;
+            border-radius: 15.5px;
+            background: #E9E9EA;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .ios-toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 27px;
+            height: 27px;
+            border-radius: 50%;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            /* Drop shadow */
+            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .ios-toggle:checked {
+            background: var(--success);
+        }
+
+        .ios-toggle:checked::after {
+            transform: translateX(20px);
+        }
+
+        /* Tab Bar (Bottom) */
+        .tab-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: calc(49px + var(--safe-bottom));
+            background: rgba(249, 249, 249, 0.94);
+            /* Translucent */
+            backdrop-filter: blur(10px);
+            border-top: 0.5px solid rgba(0, 0, 0, 0.2);
+            display: flex;
+            padding-bottom: var(--safe-bottom);
+        }
+
+        .tab-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            font-size: 10px;
+            font-weight: 500;
+        }
+
+        .tab-item.active {
+            color: var(--accent);
+        }
+
+        .tab-icon {
+            font-size: 24px;
+            margin-bottom: 2px;
+        }
+
+        /* Pages logic (SPA) */
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        .section-header {
+            padding: 0 16px;
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            margin-top: 24px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-shell">
+
+        <!-- Main Content Area -->
+        <div class="content">
+
+            <!-- PAGE: HOME -->
+            <div id="page-home" class="page active">
+                <div class="home-hero">
+                    <div class="shield-visual">
+                        <div class="shield-inner">
+                            <span class="shield-percent">62<span style="font-size:20px">%</span></span>
+                            <span class="shield-status">保護中</span>
+                        </div>
+                    </div>
+
+                    <div class="play-row">
+                        <!-- Left Action: Adaptive -->
+                        <div style="text-align:center" onclick="toggleAdaptive()">
+                            <div
+                                style="width:44px; height:44px; background:var(--bg-group); border-radius:22px; display:flex; align-items:center; justify-content:center; box-shadow:var(--card-shadow); margin:0 auto 8px;">
+                                🎤
+                            </div>
+                            <div style="font-size:11px; color:var(--text-secondary); font-weight:500;">自動調整</div>
+                        </div>
+
+                        <button class="play-btn" onclick="togglePlay(this)">
+                            ▶
+                        </button>
+
+                        <!-- Right Action: Connect -->
+                        <div style="text-align:center">
+                            <div
+                                style="width:44px; height:44px; background:var(--bg-group); border-radius:22px; display:flex; align-items:center; justify-content:center; box-shadow:var(--card-shadow); margin:0 auto 8px;">
+                                📡
+                            </div>
+                            <div style="font-size:11px; color:var(--text-secondary); font-weight:500;">接続</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="list-header">シチュエーション</div>
+                <div class="list-group">
+                    <!-- Horizontal Scroll for Situations within List Group looks bad in iOS style. Better as Grid or Carousel. -->
+                    <!-- But for vertical list feedback, let's use list items to SELECT the situation -->
+
+                    <div class="list-item" onclick="selectSituation(this)">
+                        <span style="font-size:20px; margin-right:12px;">🦶</span>
+                        <div style="flex:1;">
+                            <div style="font-size:17px;">足音が気になる</div>
+                            <div style="font-size:12px; color:var(--text-secondary);">重低音を重点的にカバー</div>
+                        </div>
+                        <span style="color:var(--accent);">✓</span>
+                    </div>
+                    <!-- Other situations hidden in collapse or separate page for simplicity in this view -->
+                    <div class="list-item" onclick="openSituationPicker()">
+                        <span style="color:var(--accent); font-size:17px;">すべてのシチュエーションを見る...</span>
+                    </div>
+                </div>
+
+                <div class="list-header">マスター音量</div>
+                <div class="list-group">
+                    <div class="list-item">
+                        <span style="font-size:16px; color:var(--text-secondary); margin-right:12px;">🔈</span>
+                        <input type="range" value="60" oninput="updateMaster(this.value)">
+                        <span style="font-size:16px; color:var(--text-secondary); margin-left:12px;">🔊</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PAGE: SOUNDS (Vertical List) -->
+            <div id="page-sounds" class="page">
+                <div class="section-header">サウンド調整</div>
+
+                <div class="list-header">ノイズ・ベース</div>
+                <div class="list-group">
+                    <!-- Noise Items: Vertical List with Sliders -->
+                    <div class="list-item">
+                        <div class="sound-row">
+                            <div class="sound-icon" style="background:#E2E8F0; color:#475569;">⚪</div>
+                            <div class="sound-info">
+                                <div class="sound-header">
+                                    <span class="sound-name">さわやか (White)</span>
+                                    <span class="sound-vol-val">20%</span>
+                                </div>
+                                <input type="range" value="20" class="vol-slider">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="sound-row">
+                            <div class="sound-icon" style="background:#FCE7F3; color:#DB2777;">🌸</div>
+                            <div class="sound-info">
+                                <div class="sound-header">
+                                    <span class="sound-name">ここちよい (Pink)</span>
+                                    <span class="sound-vol-val">50%</span>
+                                </div>
+                                <input type="range" value="50" class="vol-slider">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="sound-row">
+                            <div class="sound-icon" style="background:#F5EBE0; color:#92400E;">🪵</div>
+                            <div class="sound-info">
+                                <div class="sound-header">
+                                    <span class="sound-name">深いあたたかさ (Brown)</span>
+                                    <span class="sound-vol-val">80%</span>
+                                </div>
+                                <input type="range" value="80" class="vol-slider">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="list-header">自然の音 (レイヤー)</div>
+                <div class="list-group">
+                    <!-- Env Items: Vertical List with Sliders -->
+                    <div class="list-item">
+                        <div class="sound-row">
+                            <div class="sound-icon" style="background:#E0F2FE; color:#0284C7;">🌧️</div>
+                            <div class="sound-info">
+                                <div class="sound-header">
+                                    <span class="sound-name">雨音</span>
+                                    <span class="sound-vol-val">OFF</span>
+                                </div>
+                                <input type="range" value="0" class="vol-slider">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="sound-row">
+                            <div class="sound-icon" style="background:#ECFEFF; color:#0891B2;">🌊</div>
+                            <div class="sound-info">
+                                <div class="sound-header">
+                                    <span class="sound-name">波の音</span>
+                                    <span class="sound-vol-val">30%</span>
+                                </div>
+                                <input type="range" value="30" class="vol-slider">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="sound-row">
+                            <div class="sound-icon" style="background:#F0FDF4; color:#16A34A;">🌲</div>
+                            <div class="sound-info">
+                                <div class="sound-header">
+                                    <span class="sound-name">森林</span>
+                                    <span class="sound-vol-val">OFF</span>
+                                </div>
+                                <input type="range" value="0" class="vol-slider">
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Add Custom Button -->
+                    <div class="list-item" style="justify-content:center; color:var(--accent); font-weight:500;"
+                        onclick="alert('ファイル読み込み...')">
+                        音を追加...
+                    </div>
+                </div>
+
+                <div class="list-header">音色調整</div>
+                <div class="list-group">
+                    <div class="list-item">
+                        <div class="sound-info">
+                            <div class="sound-header">
+                                <span class="sound-name" style="font-size:15px;">明るさ (Tone)</span>
+                            </div>
+                            <input type="range" value="50">
+                            <div
+                                style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-secondary); margin-top:4px;">
+                                <span>暗い</span>
+                                <span>明るい</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="sound-info">
+                            <div class="sound-header">
+                                <span class="sound-name" style="font-size:15px;">厚み (Body)</span>
+                            </div>
+                            <input type="range" value="70">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- PAGE: TIMER & SETTINGS (Combined for simplicity in mockup or separated) -->
+            <!-- Let's keep them separate as per Nav -->
+            <div id="page-timer" class="page">
+                <div class="section-header">タイマー</div>
+                <div class="list-header">停止までの時間</div>
+                <div class="list-group">
+                    <div class="list-item">
+                        <div style="flex:1; font-size:17px;">30 分</div>
+                    </div>
+                    <div class="list-item">
+                        <div style="flex:1; font-size:17px;">1 時間</div>
+                        <span style="color:var(--accent);">✓</span>
+                    </div>
+                    <div class="list-item">
+                        <div style="flex:1; font-size:17px;">2 時間</div>
+                    </div>
+                    <div class="list-item">
+                        <div style="flex:1; font-size:17px;">朝まで (8時間)</div>
+                    </div>
+                </div>
+
+                <div class="list-header">フェードアウト設定</div>
+                <div class="list-group">
+                    <div class="list-item">
+                        <div style="flex:1; font-size:17px;">ゆっくり音を消す</div>
+                        <input type="checkbox" class="ios-toggle" checked>
+                    </div>
+                </div>
+            </div>
+
+            <div id="page-settings" class="page">
+                <div class="section-header">設定</div>
+
+                <div class="list-group">
+                    <div class="list-item">
+                        <span style="font-size:22px; margin-right:12px;">🔧</span>
+                        <div style="flex:1;">詳細モード (Pro)</div>
+                        <span style="font-size:17px; color:var(--text-tertiary);">›</span>
+                    </div>
+                </div>
+
+                <div class="list-header">環境設定</div>
+                <div class="list-group">
+                    <div class="list-item">
+                        <div style="flex:1;">ご近所配慮モード</div>
+                        <input type="checkbox" class="ios-toggle" checked>
+                    </div>
+                    <div class="list-item">
+                        <div style="flex:1;">部屋の大きさ</div>
+                        <div style="color:var(--text-secondary); margin-right:8px;">8畳</div>
+                        <span style="font-size:17px; color:var(--text-tertiary);">›</span>
+                    </div>
+                </div>
+
+                <div class="list-header">情報</div>
+                <div class="list-group">
+                    <div class="list-item">
+                        <div style="flex:1;">HushTone について</div>
+                        <span style="font-size:17px; color:var(--text-tertiary);">›</span>
+                    </div>
+                </div>
+            </div>
+
+        </div> <!-- /.content -->
+
+        <!-- Tab Bar -->
+        <div class="tab-bar">
+            <div class="tab-item active" onclick="switchPage('home', this)">
+                <div class="tab-icon">🏠</div>
+                <div>ホーム</div>
+            </div>
+            <div class="tab-item" onclick="switchPage('sounds', this)">
+                <div class="tab-icon">🎚️</div>
+                <div>サウンド</div>
+            </div>
+            <div class="tab-item" onclick="switchPage('timer', this)">
+                <div class="tab-icon">⏱</div>
+                <div>タイマー</div>
+            </div>
+            <div class="tab-item" onclick="switchPage('settings', this)">
+                <div class="tab-icon">⚙️</div>
+                <div>設定</div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function switchPage(pageId, tab) {
+            // Hide all pages
+            document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+            // Show target
+            document.getElementById('page-' + pageId).classList.add('active');
+
+            // Update tabs
+            document.querySelectorAll('.tab-item').forEach(el => el.classList.remove('active'));
+            tab.classList.add('active');
+        }
+
+        function togglePlay(btn) {
+            const isPlaying = btn.textContent.includes('⏸');
+            if (isPlaying) {
+                btn.textContent = '▶';
+                btn.style.background = 'var(--text-primary)';
+                btn.style.color = 'var(--bg-base)';
+            } else {
+                btn.textContent = '⏸';
+                btn.style.background = 'var(--danger)';
+                btn.style.color = 'white';
+            }
+        }
+
+        // Simple slider value update
+        document.querySelectorAll('.vol-slider').forEach(slider => {
+            slider.addEventListener('input', (e) => {
+                const valSpan = e.target.parentElement.querySelector('.sound-vol-val');
+                if (valSpan) {
+                    valSpan.textContent = e.target.value > 0 ? e.target.value + '%' : 'OFF';
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

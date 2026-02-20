@@ -109,11 +109,11 @@ export default function AppLayout({
                         {/* バックグラウンドステータス表示 */}
                         {bgStatus && (
                             <div className="flex items-center gap-1.5 mt-1">
-                                <div className={`w-1.5 h-1.5 rounded-full ${bgStatus.silentAudioPlaying ? 'bg-green-400' : 'bg-[--color-text-muted]/30'}`} />
+                                <div className={`w-1.5 h-1.5 rounded-full ${bgStatus.streamPlaying ? 'bg-green-400' : 'bg-[--color-text-muted]/30'}`} />
                                 <span className="text-[8px] text-[--color-text-muted] opacity-60">
                                     {bgStatus.lastError
                                         ? `❌ ${bgStatus.lastError}`
-                                        : bgStatus.silentAudioPlaying
+                                        : bgStatus.streamPlaying
                                             ? `BG: OK${bgStatus.mediaSessionActive ? ' · MS: OK' : ''}`
                                             : 'BG: Standby'
                                     }

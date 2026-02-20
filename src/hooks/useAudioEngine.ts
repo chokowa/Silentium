@@ -27,6 +27,7 @@ export function useAudioEngine() {
     const safeFilter = useRef<NeighborSafeFilter | null>(null);
     const masterAnalyser = useRef<AnalyserNode | null>(null);
     const generator = useRef<NoiseGenerator | null>(null);
+    const streamDestination = useRef<MediaStreamAudioDestinationNode | null>(null);
 
     // 現在のマスターボリュームを保持（停止/再生時の復元用）
     const lastMasterVolume = useRef<number>(0.5);
@@ -44,7 +45,7 @@ export function useAudioEngine() {
     const bgService = useRef<BackgroundAudioService>(new BackgroundAudioService());
     const currentModeName = useRef<string>('Default'); // Media Sessionメタデータ用
     const [bgStatus, setBgStatus] = useState<BackgroundAudioStatus>({
-        silentAudioPlaying: false,
+        streamPlaying: false,
         mediaSessionSupported: 'mediaSession' in navigator,
         mediaSessionActive: false,
         lastError: null,
@@ -86,7 +87,10 @@ export function useAudioEngine() {
         noiseMaster.current.connect(safeFilter.current.getInputNode());
         safeFilter.current.getOutputNode().connect(globalMaster.current);
         globalMaster.current.connect(masterAnalyser.current);
-        masterAnalyser.current.connect(ctx.destination);
+
+        // MediaStreamDestinationを作成し、<audio>タグへ送出するための実ストリームを取り出す
+        streamDestination.current = ctx.createMediaStreamDestination();
+        masterAnalyser.current.connect(streamDestination.current);
 
         // 各ノイズタイプのチャンネル作成
         NOISE_TYPES.forEach((type) => {
@@ -373,6 +377,7 @@ export function useAudioEngine() {
 
             // バックグラウンド再生サービス開始
             // ref経由で常に最新のtogglePlayを呼ぶ（Stale Closure防止）
+            // MediaStreamDestination のストリームを渡すことで、実音声を<audio>タグで出力させる
             bgService.current.start(
                 () => togglePlayRef.current?.(),
                 () => {
@@ -382,7 +387,8 @@ export function useAudioEngine() {
                         return null;
                     }
                 },
-                currentModeName.current
+                currentModeName.current,
+                streamDestination.current?.stream
             );
 
             // ループ開始
